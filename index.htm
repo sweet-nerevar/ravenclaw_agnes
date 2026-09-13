@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ravenclaw player</title>
+  <style>
+    :root {
+      --design-width: 1200px;
+      --design-height: 700px;
+      --ink: #614b3f;
+      --muted: #c5a77a;
+      --bright: #ffe8b8;
+      --screen-x: 365px;
+      --screen-y: 435px;
+      --screen-width: 229px;
+      --screen-height: 73px;
+      --volume-x: 663px;
+      --volume-y: 472px;
+      --volume-size: 54px;
+      --controls-y: 472px;
+      --prev-x: 800px;
+      --play-x: 876px;
+      --next-x: 952px;
+      --options-x: 627px;
+      --options-y: 410px;
+      --books-offset-x: 119px;
+      --books-offset-y: 127.5px;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    button, input { font: inherit; }
+    #viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+    }
+    #design {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--design-width);
+      height: var(--design-height);
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      isolation: isolate;
+    }
+    .player-art {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+    .screen {
+      position: absolute;
+      left: var(--screen-x);
+      top: var(--screen-y);
+      width: var(--screen-width);
+      height: var(--screen-height);
+      display: flex;
+      flex-direction: column;
+      padding: 3px 6px 0;
+      text-align: center;
+      background: transparent;
+    }
+    .song-title, .song-artist {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      margin: 0;
+      text-shadow: 0 1px 2px #000;
+    }
+    .song-title {
+      font-size: 23px;
+      line-height: 27px;
+      font-weight: 400;
+      color: var(--bright);
+    }
+    .song-artist {
+      font-size: 11px;
+      line-height: 15px;
+      color: var(--muted);
+    }
+    .timeline {
+      margin-top: 4px;
+      display: grid;
+      grid-template-columns: 29px minmax(0, 1fr) 29px;
+      gap: 5px;
+      align-items: center;
+    }
+    .time {
+      font-size: 11px;
+      line-height: 18px;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
+    #seek {
+      --progress: 0%;
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      height: 18px;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+    #seek:disabled { cursor: default; opacity: .45; }
+    #seek::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 2px;
+      background: linear-gradient(to right, var(--bright) 0 var(--progress), rgba(197,167,122,.28) var(--progress) 100%);
+    }
+    #seek::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 10px;
+      height: 10px;
+      margin-top: -2px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--bright);
+    }
+    #seek::-moz-range-track { height: 6px; background: rgba(197,167,122,.28); }
+    #seek::-moz-range-progress { height: 6px; background: var(--bright); }
+    #seek::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--bright); }
+
+    #books {
+      position: absolute;
+      left: var(--books-offset-x);
+      top: var(--books-offset-y);
+      width: 944px;
+      height: 445px;
+      pointer-events: none;
+    }
+    .book {
+      position: absolute;
+      left: var(--book-x);
+      top: var(--book-y);
+      width: var(--book-width);
+      height: var(--book-height);
+      padding: 0;
+      border: 0;
+      border-radius: 1px;
+      background: transparent;
+      box-shadow: none;
+      color: var(--ink);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .book-label {
+      position: absolute;
+      left: 50%;
+      top: 64%;
+      width: 137px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      transform: translate(-50%, -50%) rotate(90deg);
+      text-align: left;
+      pointer-events: none;
+    }
+    .book-artist { font-size: 14px; line-height: 16px; white-space: nowrap; }
+    .book-title { font-size: 14px; line-height: 16px; white-space: nowrap; }
+    .book[aria-pressed="true"] { color: var(--bright); }
+    .book[aria-pressed="true"] .book-label { text-shadow: 0 1px 4px #100c08, 0 0 7px rgba(255,227,171,.5); }
+    .book::after {
+      content: "";
+      position: absolute;
+      bottom: 0px;
+      left: 35%;
+      width: 30%;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--bright);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .book[aria-pressed="true"]::after { opacity: .0; }
+    .book:hover { color: #fff3d3; }
+
+    .options {
+      position: absolute;
+      left: var(--options-x);
+      top: var(--options-y);
+      display: flex;
+      gap: 18px;
+    }
+    .mode-button {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 24px;
+      padding: 3px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      opacity: .62;
+      cursor: pointer;
+    }
+    .mode-button svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 1px 2px #100b04) drop-shadow(0 0 1px #100b04); }
+    .mode-button[aria-pressed="true"], .mode-button:hover { color: var(--bright); opacity: 1; }
+    .repeat-one { position: absolute; right: -3px; top: -3px; font: 10px/1 Georgia, serif; }
+
+    .transport-button {
+      position: absolute;
+      top: var(--controls-y);
+      left: var(--control-x);
+      width: 56px;
+      height: 56px;
+      transform: translate(-50%, -50%);
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      padding: 0;
+      background: transparent;
+      color: #e3bf82;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .transport-button.play { width: 68px; height: 68px; }
+    .transport-button:hover { box-shadow: inset 0 0 0 1px rgba(255,228,178,.38); }
+    .play-symbol {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #65472a 0, #65472a 66%, transparent 74%);
+      pointer-events: none;
+    }
+    .play-symbol svg { display: block; width: 16px; height: 18px; }
+
+    .volume-knob {
+      --dial-angle: 54deg;
+      position: absolute;
+      left: var(--volume-x);
+      top: var(--volume-y);
+      width: var(--volume-size);
+      height: var(--volume-size);
+      transform: translate(-50%, -50%);
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .volume-knob.is-dragging { cursor: grabbing; }
+    .volume-tick {
+      position: absolute;
+      inset: 12%;
+      transform: rotate(var(--dial-angle));
+      pointer-events: none;
+    }
+    .volume-tick::after {
+      content: "";
+      position: absolute;
+      left: calc(50% - 1px);
+      top: 0;
+      width: 2px;
+      height: 10px;
+      border-radius: 2px;
+      background: linear-gradient(var(--bright), #a97637);
+      box-shadow: 0 1px 2px rgba(33,19,5,.65);
+    }
+    .volume-readout {
+      position: absolute;
+      top: calc(100% + 1px);
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 10px;
+      line-height: 13px;
+      text-shadow: 0 1px 3px #140d07;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .volume-knob:hover .volume-readout,
+    .volume-knob:focus .volume-readout,
+    .volume-knob.is-dragging .volume-readout { opacity: 1; }
+    button:focus-visible, #seek:focus-visible, .volume-knob:focus-visible {
+      outline: 1px solid var(--bright);
+      outline-offset: 3px;
+    }
+    .notice {
+      position: absolute;
+      left: calc(var(--screen-x) - 4px);
+      top: calc(var(--screen-y) + var(--screen-height) + 10px);
+      width: calc(var(--screen-width) + 61px);
+      margin: 0;
+      font-size: 10px;
+      line-height: 12px;
+      color: var(--bright);
+      text-align: center;
+      text-shadow: 0 1px 3px #000;
+      pointer-events: none;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    audio { display: none; }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <main id="design" aria-label="">
+      <img class="player-art" id="playerArt" src="./ravenclaw_radio.webp" alt="" draggable="false">
+      <section class="screen" aria-label="Текущий трек">
+        <h1 class="song-title" id="songTitle" aria-live="polite">runaway</h1>
+        <p class="song-artist" id="songArtist">aurora</p>
+        <div class="timeline">
+          <span class="time" id="elapsed">0:00</span>
+          <input id="seek" type="range" min="0" max="100" step="0.1" value="0" disabled aria-label="Перемотка трека" aria-valuetext="0:00">
+          <span class="time" id="duration">--:--</span>
+        </div>
+      </section>
+
+      <nav aria-label="Выбор трека на корешках книг" id="books">
+        <button class="book" type="button" data-track="0" style="--book-x:623px; --book-y:65px; --book-width:45px; --book-height:211px" aria-pressed="true" aria-label="aurora" title="aurora - runaway">
+          <span class="book-label"><span class="book-artist">aurora</span><span class="book-title">runaway</span></span>
+        </button>
+        <button class="book" type="button" data-track="1" style="--book-x:677px; --book-y:79px; --book-width:39px; --book-height:199px" aria-pressed="false" aria-label="Sleeping At Last - Eight" title="Sleeping At Last - Eight">
+          <span class="book-label"><span class="book-artist">sleeping At Last</span><span class="book-title">Eight</span></span>
+        </button>
+        <button class="book" type="button" data-track="2" style="--book-x:726px; --book-y:80px; --book-width:41px; --book-height:198px" aria-pressed="false" aria-label="Vampire Weekend - Campus" title="Vampire Weekend - Campus">
+          <span class="book-label"><span class="book-artist">Vampire Weekend</span><span class="book-title">Campus</span></span>
+        </button>
+        <button class="book" type="button" data-track="3" style="--book-x:780px; --book-y:82px; --book-width:39px; --book-height:196px" aria-pressed="false" aria-label="Regina Spektor - Folding Chair" title="Regina Spektor - Folding Chair">
+          <span class="book-label"><span class="book-artist">Regina Spektor</span><span class="book-title">Folding Chair</span></span>
+        </button>
+        <button class="book" type="button" data-track="4" style="--book-x:832px; --book-y:80px; --book-width:42px; --book-height:198px" aria-pressed="false" aria-label="Taylor Swift - Long Live" title="Taylor Swift - Long Live">
+          <span class="book-label"><span class="book-artist">Taylor Swift</span><span class="book-title">Long Live</span></span>
+        </button>
+      </nav>
+
+      <div class="options" role="group" aria-label="Режим воспроизведения">
+        <button class="mode-button" id="repeatBtn" type="button" aria-pressed="true" aria-label="Повтор: все треки" title="Повтор: все треки">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 8h13l-3-3m3 3-3 3M19 16H6l3 3m-3-3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="repeat-one" id="repeatOne" hidden aria-hidden="true">1</span>
+        </button>
+        <button class="mode-button" id="shuffleBtn" type="button" aria-pressed="false" aria-label="Перемешивание выключено" title="Перемешивание выключено">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h3c4 0 6 12 10 12h3m-3-3 3 3-3 3M4 18h3c1.5 0 3-2 4-4m2-4c1-2 2.5-4 4-4h3m-3-3 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <div class="volume-knob" id="volumeKnob" role="slider" tabindex="0" aria-label="Громкость" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70" aria-valuetext="70 процентов" title="Громкость: 70%. Потяни ручку, прокрути колесо или нажми стрелки">
+        <span class="volume-tick" aria-hidden="true"></span>
+        <output class="volume-readout" id="volumeReadout" aria-hidden="true">70%</output>
+      </div>
+
+      <div role="group" aria-label="Управление воспроизведением">
+        <button class="transport-button" id="prevBtn" type="button" style="--control-x:var(--prev-x)" aria-label="Предыдущий трек" title="Предыдущий трек"><span class="sr-only">Предыдущий трек</span></button>
+        <button class="transport-button play" id="playBtn" type="button" style="--control-x:var(--play-x)" aria-label="Воспроизвести" title="Воспроизвести">
+          <span class="play-symbol" aria-hidden="true">
+            <svg id="playIcon" viewBox="0 0 16 18" focusable="false"><path d="M4 2.5 13 9 4 15.5Z" fill="currentColor"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 16 18" focusable="false" hidden><path d="M4 3v12M12 3v12" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+          </span>
+        </button>
+        <button class="transport-button" id="nextBtn" type="button" style="--control-x:var(--next-x)" aria-label="Следующий трек" title="Следующий трек"><span class="sr-only">Следующий трек</span></button>
+      </div>
+      <p class="notice" id="playerStatus" role="status" hidden></p>
+    </main>
+  </div>
+  <audio id="audio" preload="metadata"></audio>
+
+  <script>
+    "use strict";
+    const TRACKS = [
+      { artist: "aurora", title: "runaway", url: "./1.mp3" },
+      { artist: "sleeping at last", title: "eight", url: "./2.mp3" },
+      { artist: "vampire weekend", title: "campus", url: "./3.mp3" },
+      { artist: "regina spektor", title: "folding chair", url: "./4.mp3" },
+      { artist: "taylor swift", title: "long live", url: "./5.mp3" }
+    ];
+    const $ = id => document.getElementById(id);
+    const viewport = $("viewport");
+    const design = $("design");
+    const audio = $("audio");
+    const bookButtons = Array.from(document.querySelectorAll(".book"));
+    const volumeKnob = $("volumeKnob");
+    const seek = $("seek");
+    let currentIndex = 0;
+    let volumeValue = .7;
+    let repeatMode = "all";
+    let shuffleEnabled = false;
+    let shuffleQueue = [];
+    let history = [];
+    let loadVersion = 0;
+    let volumeDrag = null;
+    let artError = "";
+    let mediaError = "";
+
+    function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+    function fitDesign() {
+      // offsetWidth/offsetHeight не включают transform: это реальные размеры из CSS.
+      const width = design.offsetWidth;
+      const height = design.offsetHeight;
+      if (!width || !height) return;
+      const scale = Math.min(viewport.clientWidth / width, viewport.clientHeight / height);
+      design.style.transform = "translate(-50%, -50%) scale(" + scale + ")";
+    }
+    function formatTime(value) {
+      if (!Number.isFinite(value) || value < 0) return "--:--";
+      const seconds = Math.floor(value);
+      return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
+    }
+    function updateStatus() {
+      $("playerStatus").textContent = mediaError || artError;
+      $("playerStatus").hidden = !(mediaError || artError);
+    }
+    function showMediaError(message) { mediaError = message; updateStatus(); }
+    function setProgress(value) {
+      const percent = Number.isFinite(value) ? clamp(value, 0, 100) : 0;
+      seek.value = String(percent);
+      seek.style.setProperty("--progress", percent + "%");
+    }
+    function updateTimeline() {
+      const current = Number.isFinite(audio.currentTime) ? Math.max(0, audio.currentTime) : 0;
+      const duration = audio.duration;
+      const available = Number.isFinite(duration) && duration > 0;
+      seek.disabled = !available;
+      $("elapsed").textContent = formatTime(current);
+      $("duration").textContent = available ? formatTime(duration) : "--:--";
+      setProgress(available ? current / duration * 100 : 0);
+      seek.setAttribute("aria-valuetext", formatTime(current) + (available ? " из " + formatTime(duration) : ""));
+    }
+    function syncPlay() {
+      const playing = !audio.paused && !audio.ended;
+      $("playIcon").hidden = playing;
+      $("pauseIcon").hidden = !playing;
+      $("playBtn").setAttribute("aria-label", playing ? "Пауза" : "Воспроизвести");
+      $("playBtn").title = playing ? "Пауза" : "Воспроизвести";
+      design.classList.toggle("is-playing", playing);
+      bookButtons.forEach((button, index) => {
+        const active = index === currentIndex;
+        button.setAttribute("aria-pressed", String(active));
+        button.title = TRACKS[index].artist + " - " + TRACKS[index].title + (active ? (playing ? " • играет" : " • выбран") : "");
+      });
+    }
+    async function playAudio(version = loadVersion) {
+      try {
+        await audio.play();
+        if (version === loadVersion) showMediaError("");
+      } catch (error) {
+        if (version !== loadVersion || error.name === "AbortError") return;
+        showMediaError(error.name === "NotAllowedError"
+          ? "Нажми кнопку воспроизведения, чтобы запустить музыку."
+          : "Не удалось загрузить " + TRACKS[currentIndex].url.replace(/^\.\//, "") + ". Проверь аудиофайл и путь.");
+        syncPlay();
+      }
+    }
+    function togglePlay() {
+      if (audio.paused || audio.ended) {
+        if (audio.ended) audio.currentTime = 0;
+        playAudio();
+      } else audio.pause();
+    }
+    function refillShuffleQueue() {
+      shuffleQueue = TRACKS.map((_, index) => index).filter(index => index !== currentIndex);
+      for (let index = shuffleQueue.length - 1; index > 0; index--) {
+        const other = Math.floor(Math.random() * (index + 1));
+        [shuffleQueue[index], shuffleQueue[other]] = [shuffleQueue[other], shuffleQueue[index]];
+      }
+    }
+    function loadTrack(index, autoplay = false, options = {}) {
+      if (!Number.isInteger(index) || index < 0 || index >= TRACKS.length) return;
+      const version = ++loadVersion;
+      audio.pause();
+      if (shuffleEnabled && index !== currentIndex && options.remember !== false) {
+        history.push(currentIndex);
+        if (history.length > 100) history.shift();
+      }
+      currentIndex = index;
+      if (shuffleEnabled && !options.fromQueue) refillShuffleQueue();
+      const track = TRACKS[currentIndex];
+      $("songTitle").textContent = track.title;
+      $("songTitle").title = track.title;
+      $("songArtist").textContent = track.artist;
+      $("songArtist").title = track.artist;
+      showMediaError("");
+      seek.disabled = true;
+      setProgress(0);
+      $("elapsed").textContent = "0:00";
+      $("duration").textContent = "--:--";
+      seek.setAttribute("aria-valuetext", "0:00");
+      audio.src = track.url;
+      audio.load();
+      syncPlay();
+      if (autoplay) playAudio(version);
+    }
+    function nextTrack(automatic = false) {
+      if (automatic && repeatMode === "one") {
+        audio.currentTime = 0;
+        updateTimeline();
+        playAudio();
+        return;
+      }
+      if (shuffleEnabled) {
+        if (!shuffleQueue.length) {
+          if (repeatMode === "off") { syncPlay(); return; }
+          refillShuffleQueue();
+        }
+        const index = shuffleQueue.shift();
+        if (index !== undefined) loadTrack(index, true, { fromQueue: true });
+      } else if (currentIndex < TRACKS.length - 1) loadTrack(currentIndex + 1, true);
+      else if (repeatMode !== "off") loadTrack(0, true);
+      else syncPlay();
+    }
+    function previousTrack() {
+      if (audio.currentTime > 3) { audio.currentTime = 0; updateTimeline(); return; }
+      if (shuffleEnabled) {
+        if (history.length) loadTrack(history.pop(), true, { remember: false });
+        else { audio.currentTime = 0; updateTimeline(); }
+      } else if (currentIndex > 0) loadTrack(currentIndex - 1, true);
+      else if (repeatMode !== "off") loadTrack(TRACKS.length - 1, true);
+      else { audio.currentTime = 0; updateTimeline(); }
+    }
+    function updateRepeatButton() {
+      const label = { all: "Повтор: все треки", one: "Повтор: один трек", off: "Повтор выключен" }[repeatMode];
+      $("repeatBtn").setAttribute("aria-pressed", String(repeatMode !== "off"));
+      $("repeatBtn").setAttribute("aria-label", label);
+      $("repeatBtn").title = label;
+      $("repeatOne").hidden = repeatMode !== "one";
+    }
+    function setVolume(value) {
+      if (!Number.isFinite(value)) return;
+      volumeValue = clamp(value, 0, 1);
+      audio.volume = volumeValue;
+      audio.muted = false;
+      const percent = Math.round(volumeValue * 100);
+      volumeKnob.style.setProperty("--dial-angle", (-135 + volumeValue * 270) + "deg");
+      volumeKnob.setAttribute("aria-valuenow", String(percent));
+      volumeKnob.setAttribute("aria-valuetext", percent + " процентов");
+      volumeKnob.title = "Громкость: " + percent + "%. Потяни ручку, прокрути колесо или нажми стрелки";
+      $("volumeReadout").textContent = percent + "%";
+    }
+    function pointerOnDial(event) {
+      const rect = volumeKnob.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      const x = (event.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+      const y = (event.clientY - rect.top - rect.height / 2) / (rect.height / 2);
+      let angle = Math.atan2(y, x) * 180 / Math.PI + 90;
+      if (angle > 180) angle -= 360;
+      return { angle, distance: Math.hypot(x, y), height: rect.height };
+    }
+    function endVolumeDrag(event) {
+      if (!volumeDrag || (event && event.pointerId !== volumeDrag.pointerId)) return;
+      const pointerId = volumeDrag.pointerId;
+      volumeDrag = null;
+      volumeKnob.classList.remove("is-dragging");
+      if (volumeKnob.hasPointerCapture(pointerId)) volumeKnob.releasePointerCapture(pointerId);
+    }
+    volumeKnob.addEventListener("pointerdown", event => {
+      if (volumeDrag || event.isPrimary === false || event.button !== 0) return;
+      const dial = pointerOnDial(event);
+      if (!dial) return;
+      const mode = dial.distance < .45 ? "vertical" : "angular";
+      volumeDrag = { pointerId: event.pointerId, mode, angle: dial.angle, y: event.clientY, height: dial.height };
+      if (mode === "angular") setVolume((clamp(dial.angle, -135, 135) + 135) / 270);
+      volumeKnob.focus({ preventScroll: true });
+      volumeKnob.setPointerCapture(event.pointerId);
+      volumeKnob.classList.add("is-dragging");
+      event.preventDefault();
+    });
+    volumeKnob.addEventListener("pointermove", event => {
+      if (!volumeDrag || event.pointerId !== volumeDrag.pointerId) return;
+      if (volumeDrag.mode === "vertical") {
+        setVolume(volumeValue + (volumeDrag.y - event.clientY) / volumeDrag.height);
+        volumeDrag.y = event.clientY;
+      } else {
+        const dial = pointerOnDial(event);
+        if (!dial || dial.distance < .25) return;
+        const delta = ((dial.angle - volumeDrag.angle + 540) % 360) - 180;
+        setVolume(volumeValue + delta / 270);
+        volumeDrag.angle = dial.angle;
+      }
+    });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach(name => volumeKnob.addEventListener(name, endVolumeDrag));
+    volumeKnob.addEventListener("wheel", event => {
+      if (!event.deltaY) return;
+      event.preventDefault();
+      setVolume(volumeValue + (event.deltaY < 0 ? .05 : -.05));
+    }, { passive: false });
+    volumeKnob.addEventListener("keydown", event => {
+      const step = event.shiftKey ? .1 : .05;
+      const change = { ArrowUp: step, ArrowRight: step, ArrowDown: -step, ArrowLeft: -step, PageUp: .1, PageDown: -.1 }[event.key];
+      if (change !== undefined) setVolume(volumeValue + change);
+      else if (event.key === "Home") setVolume(0);
+      else if (event.key === "End") setVolume(1);
+      else return;
+      event.preventDefault();
+    });
+    seek.addEventListener("input", () => {
+      if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      const value = Number(seek.value);
+      if (!Number.isFinite(value)) return;
+      audio.currentTime = clamp(value, 0, 100) / 100 * audio.duration;
+      updateTimeline();
+    });
+    bookButtons.forEach((button, index) => {
+      button.querySelector(".book-artist").textContent = TRACKS[index].artist;
+      button.querySelector(".book-title").textContent = TRACKS[index].title;
+      button.setAttribute("aria-label", TRACKS[index].artist + " - " + TRACKS[index].title);
+      button.addEventListener("click", () => loadTrack(index, true));
+      button.addEventListener("keydown", event => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        const next = (index + (event.key === "ArrowRight" ? 1 : -1) + bookButtons.length) % bookButtons.length;
+        bookButtons[next].focus({ preventScroll: true });
+        event.preventDefault();
+      });
+    });
+    $("playBtn").addEventListener("click", togglePlay);
+    $("prevBtn").addEventListener("click", previousTrack);
+    $("nextBtn").addEventListener("click", () => nextTrack(false));
+    $("repeatBtn").addEventListener("click", () => {
+      repeatMode = { all: "one", one: "off", off: "all" }[repeatMode];
+      updateRepeatButton();
+    });
+    $("shuffleBtn").addEventListener("click", () => {
+      shuffleEnabled = !shuffleEnabled;
+      history = [];
+      refillShuffleQueue();
+      const label = shuffleEnabled ? "Перемешивание включено" : "Перемешивание выключено";
+      $("shuffleBtn").setAttribute("aria-pressed", String(shuffleEnabled));
+      $("shuffleBtn").setAttribute("aria-label", label);
+      $("shuffleBtn").title = label;
+    });
+    ["loadedmetadata", "durationchange", "timeupdate", "emptied"].forEach(name => audio.addEventListener(name, updateTimeline));
+    ["play", "pause"].forEach(name => audio.addEventListener(name, syncPlay));
+    audio.addEventListener("ended", () => { updateTimeline(); syncPlay(); nextTrack(true); });
+    audio.addEventListener("error", () => {
+      if (audio.error && audio.error.code === 1) return;
+      showMediaError("Не удалось загрузить " + TRACKS[currentIndex].url.replace(/^\.\//, "") + ". Проверь аудиофайл и путь.");
+      syncPlay();
+    });
+    $("playerArt").addEventListener("error", () => {
+      artError = "Фон не загрузился. Проверь прямую ссылку на картинку.";
+      updateStatus();
+    });
+    $("playerArt").addEventListener("load", () => { artError = ""; updateStatus(); fitDesign(); });
+    document.addEventListener("keydown", event => {
+      const target = event.target;
+      if (event.code !== "Space" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || target.isContentEditable) return;
+      if (target.closest("button, input, [role='slider']")) return;
+      event.preventDefault();
+      togglePlay();
+    });
+    window.addEventListener("resize", fitDesign);
+    window.addEventListener("blur", () => endVolumeDrag());
+    if (typeof ResizeObserver !== "undefined") {
+      const sizeObserver = new ResizeObserver(fitDesign);
+      sizeObserver.observe(viewport);
+      sizeObserver.observe(design);
+    }
+    setVolume(.7);
+    updateRepeatButton();
+    loadTrack(0, false);
+    fitDesign();
+  </script>
+</body>
+</html>
