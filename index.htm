@@ -688,5 +688,35 @@
     loadTrack(0, false);
     fitDesign();
   </script>
+  <script>
+  let previousVersion = null;
+
+  async function checkForUpdates() {
+    try {
+      const response = await fetch(
+        window.location.pathname + "?check=" + Date.now(),
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) return;
+
+      const currentVersion = await response.text();
+
+      if (previousVersion === null) {
+        previousVersion = currentVersion;
+        return;
+      }
+
+      if (currentVersion !== previousVersion) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.warn("Не удалось проверить обновления:", error);
+    }
+  }
+
+  checkForUpdates();
+  setInterval(checkForUpdates, 60000);
+</script>
 </body>
 </html>
